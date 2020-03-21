@@ -1,7 +1,6 @@
 let transactions = [];
 let myChart;
 
-initIndexDB();
 
 fetch("/api/transaction")
   .then(response => {
@@ -161,9 +160,45 @@ document.querySelector("#sub-btn").onclick = function() {
 
 function saveRecord(transaction) {
   console.log("saveRecord function");
-  console.log(transaction);
+
+  initIndexDB(transaction);
 }
 
-function initIndexDB() {
+function initIndexDB(transaction) {
   console.log("initIndexDB here");
+  console.log(transaction);
+
+  let name = transaction.name;
+  let value = transaction.value;
+
+  const request = window.indexedDB.open("offlineDatabase", 1);
+  
+  // This returns a result that we can then manipulate.
+  request.onsuccess = event => {
+    console.log(request.result);
+  };
+
+  request.onupgradeneeded = ({ target }) => {
+    const db = target.result;
+    console.log("db = ");
+    console.log(db);
+    const objectStore = db.createObjectStore("transactionList", {keyPath: "transID", autoIncrement: true});
+    objectStore.createIndex("transIndex", "trans");
+
+
+  };
+
+  request.onsuccess = () => {
+    const db = request.result;
+    const transaction = db.transaction(["transactionList"], "readwrite");
+    const transactionStore = transaction.objectStore("transactionList");
+    // const transIndex = transactionStore.index("transIndex");
+
+    console.log("name = " + name);
+    console.log("value = " + value);
+
+    // Adds data to our objectStore
+    transactionStore.add({ "name": name, "value": value });
+  }
+
 }
