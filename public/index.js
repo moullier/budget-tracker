@@ -1,5 +1,7 @@
 let transactions = [];
 let myChart;
+let db;
+// let saveInMongoDB = true;
 
 
 fetch("/api/transaction")
@@ -159,13 +161,7 @@ document.querySelector("#sub-btn").onclick = function() {
 };
 
 function saveRecord(transaction) {
-  console.log("saveRecord function");
-
-  initIndexDB(transaction);
-}
-
-function initIndexDB(transaction) {
-  console.log("initIndexDB here");
+  console.log("saveRecord here");
   console.log(transaction);
 
   let name = transaction.name;
@@ -179,7 +175,7 @@ function initIndexDB(transaction) {
   };
 
   request.onupgradeneeded = ({ target }) => {
-    const db = target.result;
+    db = target.result;
     console.log("db = ");
     console.log(db);
     const objectStore = db.createObjectStore("transactionList", {keyPath: "transID", autoIncrement: true});
@@ -189,7 +185,7 @@ function initIndexDB(transaction) {
   };
 
   request.onsuccess = () => {
-    const db = request.result;
+    db = request.result;
     const transaction = db.transaction(["transactionList"], "readwrite");
     const transactionStore = transaction.objectStore("transactionList");
     // const transIndex = transactionStore.index("transIndex");
@@ -200,5 +196,51 @@ function initIndexDB(transaction) {
     // Adds data to our objectStore
     transactionStore.add({ "name": name, "value": value });
   }
+
+}
+
+// listen for app coming back online
+window.addEventListener("online", updateDatabase);
+
+function updateDatabase() {
+  console.log("coming online, updating the MongoDB");
+
+  //const request = window.indexedDB.open("offlineDatabase", 1);
+  //console.log("request: ");
+  //console.log(request);
+
+  // open a transaction on your pending db
+  const transaction = db.transaction(["transactionList"], "readwrite");
+  // access your pending object store
+  const transactionStore = transaction.objectStore("transactionList");
+  // get all records from store and set to a variable
+  const getAll = transactionStore.getAll();
+
+  getAll.onsuccess = function() {
+    if (getAll.result.length > 0) {
+      console.log("length = " + getAll.result.length);
+      fetch("/api/transaction/bulk", {
+        method: "POST",
+        body: JSON.stringify(getAll.result),
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json"
+        }
+      })
+      .then(response => response.json())
+      .then(() => {
+        // if successful, open a transaction on your pending db
+        const transaction = db.transaction(["transactionList"], "readwrite");
+
+        // access your pending object store
+        const transactionStore = transaction.objectStore("transactionList");
+
+        // clear all items in your store
+        transactionStore.clear();
+      });
+    }
+  };
+
+
 
 }
